@@ -1,0 +1,83 @@
+---
+title: "Parenting RCT (Child Analysis)"
+author: "Andrew Bogdan"
+format: html
+editor: visual
+---
+
+## Child Analysis
+
+```{r}
+#| label: packages
+# TODO: Pin versions in knitted output for reproducability
+library(tidyverse)
+library(haven)
+```
+
+Okay let's take a look at our data.
+
+```{r}
+#| label: load-data
+
+DATA_DIR <- "data"
+
+# I know double-assignment like this is bad form but I need the long names
+#  for code readability and the short names for code debug-ability
+english_baseline_df <- en_bl <- read_sav(file.path(DATA_DIR, "ENGLISH_Child Baseline Data.sav"))
+english_control_df <- en_c <- read_sav(file.path(DATA_DIR, "ENGLISH_Child Follow-Up - Control.sav"))
+english_treatment_df <- en_tx <- read_sav(file.path(DATA_DIR, "ENGLISH_Child Follow-Up - Experimental.sav"))
+spanish_baseline_df <- es_bl <- read_sav(file.path(DATA_DIR, "SPANISH_Child Baseline Data.sav"))
+spanish_baseline_2_df <- es_bl2 <- read_sav(file.path(DATA_DIR, "SPANISH 2_Child Baseline Data.sav"))
+spanish_control_df <- es_c <- read_sav(file.path(DATA_DIR, "SPANISH_Child Follow-Up - Control.sav"))
+spanish_treatment_df <- es_tx <- read_sav(file.path(DATA_DIR, "SPANISH_Child Follow-Up - Experimental.sav"))
+```
+
+```{r}
+COLUMN_CSV_DIR = "column_names"
+
+tibble(
+  new_name = "",
+  old_name = names(es_tx),
+  label = map_chr(es_tx, ~ attr(.x, "label"))
+) %>% write_csv(file.path(COLUMN_CSV_DIR, "spanish_treatment_columns.csv"))
+
+```
+
+```{r}
+# NOTE: this is not something I will ship. This is bizarre, it's just faster
+#  for me to edit. It should be an R document.
+
+# --- Helper Functions ---------------------------------------------------------
+#' Given a dataframe, will rename the columns of that dataframe
+#' according to the new_name and old_name columns of the supplied CSV.
+.rename_columns_from_file <- function(data, csv_filepath) {
+  column_mapping <- read_csv(
+    filename,
+    col_names = TRUE,
+    col_types = cols(
+      name = col_character(),
+      old_name = col_character(),
+    ),
+    col_select = all_of(c("new_name", "old_name"))
+  )
+
+  return(data %>%
+    rename(!!!setNames(column_mapping$old_name, column_mapping$new_name)))
+}
+
+
+```
+
+```{r}
+dfs <- list(
+  en_bl = english_baseline_df,
+  en_c = english_control_df,
+  en_tx = english_treatment_df,
+  es_bl = spanish_baseline_df,
+  es_bl2 = spanish_baseline_2_df,
+  es_c = spanish_control_df,
+  es_tx = spanish_treatment_df
+  )
+
+sapply(dfs, ncol)
+```

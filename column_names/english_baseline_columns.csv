@@ -1,0 +1,94 @@
+new_name,old_name,label
+start_date,StartDate,Start Date
+end_date,EndDate,End Date
+status,Status,Response Type
+ip_address,IPAddress,IP Address
+progress,Progress,Progress
+duration,Duration__in_seconds_,Duration (in seconds)
+finished,Finished,Finished
+recorded_date,RecordedDate,Recorded Date
+response_id,ResponseId,Response ID
+last_name,RecipientLastName,Recipient Last Name
+first_name,RecipientFirstName,Recipient First Name
+email,RecipientEmail,Recipient Email
+external_reference,ExternalReference,External Data Reference
+location_latitude,LocationLatitude,Location Latitude
+location_longitude,LocationLongitude,Location Longitude
+distribution_channel,DistributionChannel,Distribution Channel
+language,UserLanguage,User Language
+country_code,Q3,"First, please select your country code:"
+phone_number_1,Q4,Please enter your parent's mobile number (without country code):
+phone_number_1_conf,Q5,Please confirm your parent's mobile number (without country code):
+phone_number_2,Q6,Please enter your parent's mobile number (without country code):
+phone_number_2_conf,Q7,Please confirm your parent's mobile number (without country code):
+phone_number_3,Q8,Please enter your parent's mobile number (without country code):
+phone_number_3_conf,Q9,Please confirm your parent's mobile number (without country code):
+phone_number_cc,Q10,"Please enter your parent's mobile number in the format of / +[country code] [phone number]"
+phone_number_cc_conf,Q11,"Please confirm your parent's mobile number in the format of / +[country code] [phone number]"
+age,Q12,How old are you?
+birth_day,Q13,"What is your birthday? / Day"
+birth_month,Q14,Month
+birth_year,Q15,Year
+adolescent_1,Q16_1,"Please respond to the following questions on a scale from 0 to 10: - Overall, how satisfied are you with life as a whole these days?"
+adolescent_2,Q17_1,Q17 - In general I consider myself a happy person.
+adolescent_3,Q18_1,"Q18 - In general, how would you rate your physical health?"
+adolescent_4,Q19_1,Q19 - How would you rate your overall mental health?
+adolescent_5,Q20_1,"Q20 - Overall, to what extent do you feel the things you do in your life are worthwhile?"
+adolescent_6,Q21_1,Q21 - I am doing things now that will help me achieve my goals in life.
+adolescent_7,Q22_1,"Q22 - I always act to promote good in all circumstances, even in difficult and challenging situations."
+adolescent_8,Q23_1,Q23 - I am always able to give up some happiness now for greater happiness later.
+adolescent_9,Q24_1,Q24 - I am content with my friendships and relationships.
+adolescent_10,Q25_1,Q25 - I have people in my life I can talk to about things that really matter.
+adolescent_11,Q26_1,Q26 - My family has enough money to live a truly decent life.
+adolescent_12,Q27_1,"Q27 - How often do you worry about safety, food, or housing?"
+childhood_1,Q28_1,"Please respond to the following questions on a scale from 0 to 10: - Overall, I am happy with life."
+childhood_2,Q29_1,Q29 - I’m a happy person.
+childhood_3,Q30_1,Q30 - How healthy are you?
+childhood_4,Q31_1,Q31 - My mind is at peace.
+childhood_5,Q32_1,Q32 - Do you feel the things you do in your life matter?
+childhood_6,Q33_1,Q33 - I am doing things now that will help me in my life when I grow up.
+childhood_7,Q34_1,"Q34 - I always try to do the right thing, even when it is hard."
+childhood_8,Q35_1,Q35 - I am always able to do something hard now that I know will make me happy later.
+childhood_9,Q36_1,Q36 - I am happy with my friendships and relationships.
+childhood_10,Q37_1,Q37 - I have people in my life I can talk to about things that really matter.
+childhood_11,Q38_1,Q38 - My family has enough money to live a good life.
+childhood_12,Q39_1,"Q39 - How often do you worry about being safe, having food to eat, or having a place to live?"
+ippa_1,Q40_1,Please think about the parent who shared this questionnaire with you when you respond to the following statements. - My parent senses when I’m upset about something.
+ippa_2,Q40_2,Please think about the parent who shared this questionnaire with you when you respond to the following statements. - I feel that my parent doesn’t understand me.
+ippa_3,Q40_3,Please think about the parent who shared this questionnaire with you when you respond to the following statements. - My parent encourages me to talk about my difficulties.
+ippa_4,Q40_4,Please think about the parent who shared this questionnaire with you when you respond to the following statements. - My parent trusts my judgment.
+ippa_5,Q40_5,"Please think about the parent who shared this questionnaire with you when you respond to the following statements. - If my parent knows something is bothering me, she asks me about it."
+ippa_6,Q40_6,Please think about the parent who shared this questionnaire with you when you respond to the following statements. - I cannot depend on my parent these days.
+ippa_7,Q40_7,"Please think about the parent who shared this questionnaire with you when you respond to the following statements. - When we discuss things, my parent considers my point of view."
+ippa_8,Q40_8,Please think about the parent who shared this questionnaire with you when you respond to the following statements. - I tell my parent about my problems and troubles.
+ippa_9,Q40_9,Please think about the parent who shared this questionnaire with you when you respond to the following statements. - I get upset a lot more than my parent knows about.
+ippa_10,Q40_10,Please think about the parent who shared this questionnaire with you when you respond to the following statements. - My parent helps me to understand myself better.
+ippa_11,Q40_11,Please think about the parent who shared this questionnaire with you when you respond to the following statements. - My parent respects my feelings.
+ippa_12,Q40_12,Please think about the parent who shared this questionnaire with you when you respond to the following statements. - My parent doesn’t understand what I’m going through these days.
+ippa_13,Q40_13,Please think about the parent who shared this questionnaire with you when you respond to the following statements. - I can count on my parent when I need to get something off my chest.
+ippa_14,Q40_14,Please think about the parent who shared this questionnaire with you when you respond to the following statements. - I trust my parent.
+patience_1,Q41_1,Please respond to the following: - I am patient with other people.
+patience_2,Q41_2,Please respond to the following: - My parents would say I am very patient.
+serentiy_1,Q42_1,Please respond to the following: - I am pretty calm.
+serentiy_2,Q42_2,Please respond to the following: - I like to be at peace.
+serentiy_3,Q42_3,Please respond to the following: - When someone bothers me I try to stay calm.
+serentiy_4,Q42_4,Please respond to the following: - I am almost always relaxed.
+serentiy_5,Q42_5,Please respond to the following: - When things go wrong I try to calm myself down.
+serentiy_6,Q42_6,Please respond to the following: - Even if other people are nervous I can feel calm.
+serentiy_7,Q42_7,Please respond to the following: - Most days I feel at peace.
+serentiy_8,Q42_8,"Please respond to the following: - Even if I have problems, I still stay calm."
+serentiy_9,Q42_9,Please respond to the following: - I stay calm even if I can't do what I like.
+serentiy_10,Q42_10,Please respond to the following: - I solve problems very calmly.
+serentiy_11,Q42_11,Please respond to the following: - When I am scared I try to calm myself down.
+parent_love_1,Q43_1,Please think about the parent who shared this questionnaire with you when you respond to the following questions. - I am deeply loved by my mother/father.
+parent_love_2,Q43_2,Please think about the parent who shared this questionnaire with you when you respond to the following questions. - My mother/father deeply desires that our lives will always be closely connected.
+parent_love_3,Q43_3,Please think about the parent who shared this questionnaire with you when you respond to the following questions. - My mother/father deeply desires that all will go well for me.
+child_love_1,Q44_1,Q44 - I deeply love my mother/father
+child_love_2,Q44_2,Q44 - I really desire that my life will always be closely connected with my mother/father
+child_love_3,Q44_3,Q44 - I really want everything to go well for my mother/father
+gender,Q45,What is your gender? - Selected Choice
+gender_custom,Q45_3_TEXT,What is your gender? - Prefer to describe it myself - Text
+religion,Q46,How often do you attend religious services?
+english_proficiency,Q47,What is your English proficiency?
+phone_use,Q48,"On a typical day, how many hours do you spend on your phone/mobile device?"
+quality_time,Q49,"Please think about your parent who shared this questionnaire with you when you respond to the following statement. / I spend as much quality time as I’d like to with my parent."
