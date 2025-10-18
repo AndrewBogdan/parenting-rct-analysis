@@ -1,7 +1,8 @@
 # --- Project.gitignore ---
 # Don't want to commit input data to VC
-data/
-*.dta
+data/*
+# Except for the file which says what data I need
+!data/DATA.md
 
 # -------------------------------------
 # Gitignore templates

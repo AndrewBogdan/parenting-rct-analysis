@@ -1,11 +1,13 @@
+#' It seems that our data has a unique column name for each question across
+#'  every survey in the same language. This is great, it allows us to nicely 
+#'  rename the columns into something legible without writing something 
+#'  long and similar six times.
+
 # I named the columns in Excel, exported a CSV, and then used the following
 #  regex: s/^(.*?),(.*?),(.*)$/  # $3\n  $1 = "$2",\n/g to make this mapping
 
-#' It seems that our data has a unique column name for each question across
-#'  every survey. This is great, it allows us to nicely rename the columns
-#'  into something legible without writing something long and similar six
-#'  times. This is the map of old name to new name (new names on the right).
-column_name_map_english <- c(
+#' Names common to both languages; new ones on the right.
+column_name_map_common <- c(
   # Start Date
   StartDate = "start_date",
   
@@ -55,8 +57,11 @@ column_name_map_english <- c(
   DistributionChannel = "distribution_channel",
   
   # User Language
-  UserLanguage = "language",
-  
+  UserLanguage = "language"
+)
+
+#' Names for English surveys; new ones on the right.
+column_name_map_english <- c(
   # "First, please select your country code:"
   Q3 = "country_code",
   
@@ -376,58 +381,8 @@ column_name_map_english <- c(
   Q105 = "extra_scale_9_frq"
 )
 
+#' Names for Spanish surveys; new ones on the right.
 column_name_map_spanish <- c(
-  # Start Date
-  StartDate = "start_date",
-
-  # End Date
-  EndDate = "end_date",
-
-  # Response Type
-  Status = "status",
-
-  # IP Address
-  IPAddress = "ip_address",
-
-  # Progress
-  Progress = "progress",
-
-  # Duration (in seconds)
-  Duration__in_seconds_ = "duration",
-
-  # Finished
-  Finished = "finished",
-
-  # Recorded Date
-  RecordedDate = "recorded_date",
-
-  # Response ID
-  ResponseId = "response_id",
-
-  # Recipient Last Name
-  RecipientLastName = "last_name",
-
-  # Recipient First Name
-  RecipientFirstName = "first_name",
-
-  # Recipient Email
-  RecipientEmail = "email",
-
-  # External Data Reference
-  ExternalReference = "external_reference",
-
-  # Location Latitude
-  LocationLatitude = "location_latitude",
-
-  # Location Longitude
-  LocationLongitude = "location_longitude",
-
-  # Distribution Channel
-  DistributionChannel = "distribution_channel",
-
-  # User Language
-  UserLanguage = "language",
-
   # "Primero, seleccione el código de tu país:"
   Q3 = "country_code",
 
@@ -582,37 +537,37 @@ column_name_map_spanish <- c(
   Q39_2 = "patience_2",
 
   # Por favor responda a lo siguiente: - Soy bastante tranquilo/a.
-  Q40_1 = "serentiy_1",
+  Q40_1 = "serenity_1",
 
   # Por favor responda a lo siguiente: - Me gusta estar en paz.
-  Q40_2 = "serentiy_2",
+  Q40_2 = "serenity_2",
 
   # Por favor responda a lo siguiente: - Cuando alguien me molesta trato de quedarme tranquilo/a.
-  Q40_3 = "serentiy_3",
+  Q40_3 = "serenity_3",
 
   # Por favor responda a lo siguiente: - Casi siempre estoy relajado/a.
-  Q40_4 = "serentiy_4",
+  Q40_4 = "serenity_4",
 
   # Por favor responda a lo siguiente: - Cuando las cosas salen mal intento tranquilizarme.
-  Q40_5 = "serentiy_5",
+  Q40_5 = "serenity_5",
 
   # Por favor responda a lo siguiente: - Aunque las demás personas estén nerviosos yo puedo sentirme tranquilo/a.
-  Q40_6 = "serentiy_6",
+  Q40_6 = "serenity_6",
 
   # Por favor responda a lo siguiente: - La mayor parte de los días me siento en paz.
-  Q40_7 = "serentiy_7",
+  Q40_7 = "serenity_7",
 
   # "Por favor responda a lo siguiente: - Aunque tenga problemas, igual mantengo la calma."
-  Q40_8 = "serentiy_8",
+  Q40_8 = "serenity_8",
 
   # Por favor responda a lo siguiente: - Me quedo tranquilo/a aunque no pueda hacer lo que me gusta.
-  Q40_9 = "serentiy_9",
+  Q40_9 = "serenity_9",
 
   # Por favor responda a lo siguiente: - Soluciono los problemas con mucha tranquilidad.
-  Q40_10 = "serentiy_10",
+  Q40_10 = "serenity_10",
 
   # Por favor responda a lo siguiente: - Cuando tengo miedo trato de serenarme.
-  Q40_11 = "serentiy_11",
+  Q40_11 = "serenity_11",
 
   # "Por favor, piensa en tu padre o madre, el/la que compartió este cuestionario contigo, cuando respondas a las siguientes declaraciones. - Mi madre/padre me ama profundamente."
   Q41_1 = "parent_love_1",
@@ -660,10 +615,14 @@ column_name_map_spanish <- c(
   Q72 = "extra_binary_2_frq",
 
   # "En los últimos 2 meses, ¿intentaron tus padres ayudarte a tranquilizarte?"
+  Q51 = "extra_binary_3",  # Two names for the same question
   Q73 = "extra_binary_3",
 
   # "¿Qué sucedió? ¿Qué hicieron? ¿Hicieron algo diferente a lo habitual? Si es así, ¿qué?"
   Q74 = "extra_binary_3_frq",
+  
+  # "En los últimos 2 meses, ¿intentaron tus padres enseñarte algo durante un momento difícil?"
+  Q53 = "extra_binary_4",
 
   # "En los últimos 2 meses, ¿intentaron tus padres comprender tu perspectiva (lo que piensas) sobre un desacuerdo?"
   Q57 = "extra_binary_5",

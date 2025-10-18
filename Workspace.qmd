@@ -64,8 +64,39 @@ rename_columns <- function(df, column_name_map) {
     .cols = any_of(names(column_name_map))
     )
 }
+
+english_baseline_df <- english_baseline_df %>%
+  rename_columns(column_name_map_common) %>%
+  rename_columns(column_name_map_english)
+
+english_control_df <- english_control_df %>%
+  rename_columns(column_name_map_common) %>%
+  rename_columns(column_name_map_english)
+
+english_treatment_df <- english_treatment_df %>%
+  rename_columns(column_name_map_common) %>%
+  rename_columns(column_name_map_english)
+
+spanish_baseline_df <- spanish_baseline_df %>%
+  rename_columns(column_name_map_common) %>%
+  rename_columns(column_name_map_spanish)
+
+spanish_baseline_2_df <- spanish_baseline_2_df %>%
+  rename_columns(column_name_map_common) %>%
+  rename_columns(column_name_map_spanish)
+
+spanish_control_df <- spanish_control_df %>%
+  rename_columns(column_name_map_common) %>%
+  rename_columns(column_name_map_spanish)
+
+spanish_treatment_df <- spanish_treatment_df %>%
+  rename_columns(column_name_map_common) %>%
+  rename_columns(column_name_map_spanish)
 ```
 
+This here is a cell which will dump to a CSV the old column names, new column
+names, and label of the dataframes. This is for visual inspection, to make 
+sure we labeled our data correctly.
 ```{r}
 #| label: dump-column-debug
 #| eval: false
@@ -80,104 +111,12 @@ DEBUG_COLUMN_NAMES_DIR <- "debug_column_names"
   ) %>% write_csv(file.path(DEBUG_COLUMN_NAMES_DIR, csv_filename))
 }
 
-english_baseline_df <- english_baseline_df %>% rename_columns(column_name_map_english)
-english_control_df <- english_control_df %>% rename_columns(column_name_map_english)
-english_treatment_df <- english_treatment_df %>% rename_columns(column_name_map_english)
-
 english_baseline_df %>% .debug_dump_column_info_to_csv("english_baseline.csv")
 english_control_df %>% .debug_dump_column_info_to_csv("english_control.csv")
 english_treatment_df %>% .debug_dump_column_info_to_csv("english_treatment.csv")
-
-
-
+spanish_baseline_df %>% .debug_dump_column_info_to_csv("spanish_baseline.csv")
+spanish_baseline_2_df %>% .debug_dump_column_info_to_csv("spanish_baseline_2.csv")
+spanish_control_df %>% .debug_dump_column_info_to_csv("spanish_control.csv")
+spanish_treatment_df %>% .debug_dump_column_info_to_csv("spanish_treatment.csv")
 ```
 
-
-```{r}
-COLUMN_CSV_DIR = "column_names"
-
-save_column_names_as_csv <- function(df, filename) {
-  tibble(
-    new_name = "", #.column_name_map[names(df)] %>% replace_na(""),
-    old_name = names(df),
-    label = (
-      map_chr(df, ~ attr(.x, "label")) 
-      %>% str_replace_all(pattern="\n+", replacement=" / ")
-    )
-  ) %>% write_csv(file.path(COLUMN_CSV_DIR, filename))
-}
-
-save_column_names_as_csv(es_bl, "test.csv")
-
-```
-
-```{r}
-source("load_data.R")
-
-stopifnot(
-  names(english_baseline_df) %in% names(.column_name_map),
-  names(english_control_df) %in% names(.column_name_map),
-  names(english_treatment_df) %in% names(.column_name_map),
-  names(spanish_baseline_df) %in% names(.column_name_map),
-  names(spanish_baseline_2_df) %in% names(.column_name_map),
-  names(spanish_control_df) %in% names(.column_name_map),
-  names(spanish_treatment_df) %in% names(.column_name_map),
-)
-
-df <- df %>% rename_with(
-  .fn = ~ .column_name_map[.x],
-  .cols = any_of(names(.column_name_map))
-)
-```
-
-
-```{r}
-COLUMN_CSV_DIR = "column_names"
-
-tibble(
-  new_name = .column_name_map[names],
-  old_name = names(es_bl),
-  label = map_chr(es_bl, ~ attr(.x, "label"))
-) %>% write_csv(file.path(COLUMN_CSV_DIR, "spanish_baseline_columns.csv"))
-
-```
-
-
-```{r}
-# NOTE: this is not something I will ship. This is bizarre, it's just faster
-#  for me to edit. It should be an R document.
-
-# --- Helper Functions ---------------------------------------------------------
-#' Given a dataframe, will rename the columns of that dataframe
-#' according to the new_name and old_name columns of the supplied CSV.
-.rename_columns_from_file <- function(data, csv_filepath) {
-  column_mapping <- read_csv(
-    filename,
-    col_names = TRUE,
-    col_types = cols(
-      name = col_character(),
-      old_name = col_character(),
-    ),
-    col_select = all_of(c("new_name", "old_name"))
-  )
-
-  return(data %>%
-    rename(!!!setNames(column_mapping$old_name, column_mapping$new_name)))
-}
-
-
-```
-
-```{r}
-dfs <- list(
-  en_bl = english_baseline_df,
-  en_c = english_control_df,
-  en_tx = english_treatment_df,
-  es_bl = spanish_baseline_df,
-  es_bl2 = spanish_baseline_2_df,
-  es_c = spanish_control_df,
-  es_tx = spanish_treatment_df
-  )
-
-sapply(dfs, ncol)
-```
