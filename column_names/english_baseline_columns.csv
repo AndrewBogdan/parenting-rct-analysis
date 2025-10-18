@@ -23,10 +23,10 @@ phone_number_2,Q6,Please enter your parent's mobile number (without country code
 phone_number_2_conf,Q7,Please confirm your parent's mobile number (without country code):
 phone_number_3,Q8,Please enter your parent's mobile number (without country code):
 phone_number_3_conf,Q9,Please confirm your parent's mobile number (without country code):
-phone_number_cc,Q10,"Please enter your parent's mobile number in the format of / +[country code] [phone number]"
-phone_number_cc_conf,Q11,"Please confirm your parent's mobile number in the format of / +[country code] [phone number]"
+phone_number_cc,Q10,Please enter your parent's mobile number in the format of / +[country code] [phone number]
+phone_number_cc_conf,Q11,Please confirm your parent's mobile number in the format of / +[country code] [phone number]
 age,Q12,How old are you?
-birth_day,Q13,"What is your birthday? / Day"
+birth_day,Q13,What is your birthday? / Day
 birth_month,Q14,Month
 birth_year,Q15,Year
 adolescent_1,Q16_1,"Please respond to the following questions on a scale from 0 to 10: - Overall, how satisfied are you with life as a whole these days?"
@@ -91,4 +91,4 @@ gender_custom,Q45_3_TEXT,What is your gender? - Prefer to describe it myself - T
 religion,Q46,How often do you attend religious services?
 english_proficiency,Q47,What is your English proficiency?
 phone_use,Q48,"On a typical day, how many hours do you spend on your phone/mobile device?"
-quality_time,Q49,"Please think about your parent who shared this questionnaire with you when you respond to the following statement. / I spend as much quality time as I’d like to with my parent."
+quality_time,Q49,Please think about your parent who shared this questionnaire with you when you respond to the following statement. / I spend as much quality time as I’d like to with my parent.

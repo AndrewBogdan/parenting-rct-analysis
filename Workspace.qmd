@@ -7,7 +7,7 @@ editor: visual
 
 ## Child Analysis
 
-```{r}
+```{r message=FALSE}
 #| label: packages
 # TODO: Pin versions in knitted output for reproducability
 library(tidyverse)
@@ -21,27 +21,127 @@ Okay let's take a look at our data.
 
 DATA_DIR <- "data"
 
+#' Load .sav data from disk and perform some basic universal cleaning.
+#' Do not add any input variables to this function. If you make this function
+#'  complicated, then when it breaks, you will have to write a simpler one
+#'  to load the data with. How annoying would that be?
+load_data <- function(sav_filename, column_names) {
+  file.path(DATA_DIR, sav_filename) %>%
+    read_sav() %>%
+    imap(\(column, name) {
+      # Remove newlines from the labels so it's easier to read
+      attr(column, "label") <- str_replace_all(attr(column, "label"), "\n+", " / ")
+      # Save the loaded name for debug purposes
+      attr(column, "original_name") <- name
+      column
+    }) %>%
+    as_tibble()
+}
+
 # I know double-assignment like this is bad form but I need the long names
 #  for code readability and the short names for code debug-ability
-english_baseline_df <- en_bl <- read_sav(file.path(DATA_DIR, "ENGLISH_Child Baseline Data.sav"))
-english_control_df <- en_c <- read_sav(file.path(DATA_DIR, "ENGLISH_Child Follow-Up - Control.sav"))
-english_treatment_df <- en_tx <- read_sav(file.path(DATA_DIR, "ENGLISH_Child Follow-Up - Experimental.sav"))
-spanish_baseline_df <- es_bl <- read_sav(file.path(DATA_DIR, "SPANISH_Child Baseline Data.sav"))
-spanish_baseline_2_df <- es_bl2 <- read_sav(file.path(DATA_DIR, "SPANISH 2_Child Baseline Data.sav"))
-spanish_control_df <- es_c <- read_sav(file.path(DATA_DIR, "SPANISH_Child Follow-Up - Control.sav"))
-spanish_treatment_df <- es_tx <- read_sav(file.path(DATA_DIR, "SPANISH_Child Follow-Up - Experimental.sav"))
+english_baseline_df <- load_data("ENGLISH_Child Baseline Data.sav")
+english_control_df <- load_data("ENGLISH_Child Follow-Up - Control.sav")
+english_treatment_df <- load_data("ENGLISH_Child Follow-Up - Experimental.sav")
+spanish_baseline_df <- load_data("SPANISH_Child Baseline Data.sav")
+spanish_baseline_2_df <- load_data("SPANISH 2_Child Baseline Data.sav")
+spanish_control_df <- load_data("SPANISH_Child Follow-Up - Control.sav")
+spanish_treatment_df <- load_data("SPANISH_Child Follow-Up - Experimental.sav")
 ```
+
+I want usable names now. You'll notice I (above) saved the old names as an
+attribute in the columns. This is for debugging, as I'm worried that I'll 
+misinterpret the columns or mismatch them columns when merging.
+```{r}
+#| label: rename-columns
+
+# This document has the name reassignments so this data is a bit more legible.
+source("util/column_name_maps.R")
+
+rename_columns <- function(df, column_name_map) {
+  df %>% rename_with(
+    .fn = ~ column_name_map[.x],
+    .cols = any_of(names(column_name_map))
+    )
+}
+```
+
+```{r}
+#| label: dump-column-debug
+#| eval: false
+
+DEBUG_COLUMN_NAMES_DIR <- "debug_column_names"
+
+.debug_dump_column_info_to_csv <- function(df, csv_filename) {
+  tibble(
+    name = names(df),
+    original_name = map_chr(df, ~ attr(.x, "original_name")),
+    label = map_chr(df, ~ attr(.x, "label"))
+  ) %>% write_csv(file.path(DEBUG_COLUMN_NAMES_DIR, csv_filename))
+}
+
+english_baseline_df <- english_baseline_df %>% rename_columns(column_name_map_english)
+english_control_df <- english_control_df %>% rename_columns(column_name_map_english)
+english_treatment_df <- english_treatment_df %>% rename_columns(column_name_map_english)
+
+english_baseline_df %>% .debug_dump_column_info_to_csv("english_baseline.csv")
+english_control_df %>% .debug_dump_column_info_to_csv("english_control.csv")
+english_treatment_df %>% .debug_dump_column_info_to_csv("english_treatment.csv")
+
+
+
+```
+
+
+```{r}
+COLUMN_CSV_DIR = "column_names"
+
+save_column_names_as_csv <- function(df, filename) {
+  tibble(
+    new_name = "", #.column_name_map[names(df)] %>% replace_na(""),
+    old_name = names(df),
+    label = (
+      map_chr(df, ~ attr(.x, "label")) 
+      %>% str_replace_all(pattern="\n+", replacement=" / ")
+    )
+  ) %>% write_csv(file.path(COLUMN_CSV_DIR, filename))
+}
+
+save_column_names_as_csv(es_bl, "test.csv")
+
+```
+
+```{r}
+source("load_data.R")
+
+stopifnot(
+  names(english_baseline_df) %in% names(.column_name_map),
+  names(english_control_df) %in% names(.column_name_map),
+  names(english_treatment_df) %in% names(.column_name_map),
+  names(spanish_baseline_df) %in% names(.column_name_map),
+  names(spanish_baseline_2_df) %in% names(.column_name_map),
+  names(spanish_control_df) %in% names(.column_name_map),
+  names(spanish_treatment_df) %in% names(.column_name_map),
+)
+
+df <- df %>% rename_with(
+  .fn = ~ .column_name_map[.x],
+  .cols = any_of(names(.column_name_map))
+)
+```
+
 
 ```{r}
 COLUMN_CSV_DIR = "column_names"
 
 tibble(
-  new_name = "",
-  old_name = names(es_tx),
-  label = map_chr(es_tx, ~ attr(.x, "label"))
-) %>% write_csv(file.path(COLUMN_CSV_DIR, "spanish_treatment_columns.csv"))
+  new_name = .column_name_map[names],
+  old_name = names(es_bl),
+  label = map_chr(es_bl, ~ attr(.x, "label"))
+) %>% write_csv(file.path(COLUMN_CSV_DIR, "spanish_baseline_columns.csv"))
 
 ```
+
 
 ```{r}
 # NOTE: this is not something I will ship. This is bizarre, it's just faster
