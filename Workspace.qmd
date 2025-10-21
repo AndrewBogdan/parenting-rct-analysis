@@ -12,6 +12,7 @@ editor: visual
 # TODO: Pin versions in knitted output for reproducability
 library(tidyverse)
 library(haven)
+library(knitr)  # For kable, you don't _really_ need it
 ```
 
 Okay let's take a look at our data.
@@ -58,7 +59,7 @@ I want usable names now. You'll notice I (above) saved the old names as an attri
 # This document has the name reassignments so this data is a bit more legible.
 source("util/column_name_maps.R")
 
-rename_columns <- function(df, column_name_map) {
+.rename_columns <- function(df, column_name_map) {
   df %>% rename_with(
     .fn = ~ column_name_map[.x],
     .cols = any_of(names(column_name_map))
@@ -66,63 +67,65 @@ rename_columns <- function(df, column_name_map) {
 }
 
 english_baseline_df <- english_baseline_df %>%
-  rename_columns(column_name_map_common) %>%
-  rename_columns(column_name_map_english)
+  .rename_columns(column_name_map_common) %>%
+  .rename_columns(column_name_map_english)
 
 english_control_df <- english_control_df %>%
-  rename_columns(column_name_map_common) %>%
-  rename_columns(column_name_map_english)
+  .rename_columns(column_name_map_common) %>%
+  .rename_columns(column_name_map_english)
 
 english_treatment_df <- english_treatment_df %>%
-  rename_columns(column_name_map_common) %>%
-  rename_columns(column_name_map_english)
+  .rename_columns(column_name_map_common) %>%
+  .rename_columns(column_name_map_english)
 
 spanish_baseline_df <- spanish_baseline_df %>%
-  rename_columns(column_name_map_common) %>%
-  rename_columns(column_name_map_spanish)
+  .rename_columns(column_name_map_common) %>%
+  .rename_columns(column_name_map_spanish)
 
 spanish_baseline_2_df <- spanish_baseline_2_df %>%
-  rename_columns(column_name_map_common) %>%
-  rename_columns(column_name_map_spanish)
+  .rename_columns(column_name_map_common) %>%
+  .rename_columns(column_name_map_spanish)
 
 spanish_control_df <- spanish_control_df %>%
-  rename_columns(column_name_map_common) %>%
-  rename_columns(column_name_map_spanish)
+  .rename_columns(column_name_map_common) %>%
+  .rename_columns(column_name_map_spanish)
 
 spanish_treatment_df <- spanish_treatment_df %>%
-  rename_columns(column_name_map_common) %>%
-  rename_columns(column_name_map_spanish)
+  .rename_columns(column_name_map_common) %>%
+  .rename_columns(column_name_map_spanish)
 ```
 
-This here is a cell which will dump to a CSV the old column names, new column names, and label of the dataframes. This is for visual inspection, to make sure we labeled our data correctly.
+Before we merge, we want to save some information about where our columns came
+from. We're going to collect the old column names, new column names, and labels
+for each source dataframe into a tibble. This is for visual inspection, to make 
+sure we labeled our data correctly.
 
 ```{r}
-#| label: dump-column-debug
-#| eval: false
+#| label: col-data-tracking
 
-DEBUG_COLUMN_NAMES_DIR <- "debug_column_names"
-
-.debug_dump_column_info_to_csv <- function(df, csv_filename) {
+.dump_column_info <- function(df, postfix = "") {
   tibble(
-    name = names(df),
-    original_name = map_chr(df, ~ attr(.x, "original_name") %||% ""),
-    label = map_chr(df, ~ attr(.x, "label") %||% "")
-  ) %>% write_csv(file.path(DEBUG_COLUMN_NAMES_DIR, csv_filename))
+    column_name = names(df),
+    # This is wild, I know
+    !!paste0("original_name", postfix) := map_chr(df, ~ attr(.x, "original_name") %||% ""),
+    !!paste0("label", postfix) := map_chr(df, ~ attr(.x, "label") %||% "")
+  )
 }
 
-english_baseline_df %>% .debug_dump_column_info_to_csv("english_baseline.csv")
-english_control_df %>% .debug_dump_column_info_to_csv("english_control.csv")
-english_treatment_df %>% .debug_dump_column_info_to_csv("english_treatment.csv")
-spanish_baseline_df %>% .debug_dump_column_info_to_csv("spanish_baseline.csv")
-spanish_baseline_2_df %>% .debug_dump_column_info_to_csv("spanish_baseline_2.csv")
-spanish_control_df %>% .debug_dump_column_info_to_csv("spanish_control.csv")
-spanish_treatment_df %>% .debug_dump_column_info_to_csv("spanish_treatment.csv")
+column_digest <- .dump_column_info(english_baseline_df, "_en_bl") %>%
+  full_join(.dump_column_info(english_control_df, "_en_c"), by = "column_name") %>%
+  full_join(.dump_column_info(english_treatment_df, "_en_tx"), by = "column_name") %>%
+  full_join(.dump_column_info(spanish_baseline_df, "_es_bl"), by = "column_name") %>%
+  full_join(.dump_column_info(spanish_baseline_2_df, "_es_bl2"), by = "column_name") %>%
+  full_join(.dump_column_info(spanish_control_df, "_es_c"), by = "column_name") %>%
+  full_join(.dump_column_info(spanish_treatment_df, "_es_tx"), by = "column_name")
+
 ```
 
 Alright now let's merge them. I'd like to make some more accountability on if we are merging the right columns together, but knowing what they look like merged will be super helpful for that.
 
 ```{r}
-#| label: data-tracking
+#| label: row-data-tracking
 
 # Add languages, baseline/control/treatment, legible ID column
 .languages = c("english", "spanish")
@@ -185,7 +188,8 @@ spanish_treatment_df <- spanish_treatment_df %>%
   relocate(unique_index)
 ```
 
-This next cell is going to make a bunch of warnings. I am suppressing them against my better judgement— it doesn't like that we're combining columns with haven labels that are different. Some are Spanish, and some are English. For data accountability reasons, I should handle this, I'm just in a rush right now.
+This next cell is going to make a bunch of warnings. I am suppressing them against my better judgement— it doesn't like that we're combining columns with haven labels that are different. Some are Spanish, and some are English. I'll remove the labels manually when I 
+get time.
 
 ```{r warning=FALSE}
 #| label: merge
@@ -211,7 +215,7 @@ We want to match baseline to treatment/control entries. We're going to use phone
 
 #' This function removes all non-digits and then takes the 
 #' last 10 digits to get the phone number without country code.
-clean_phone_number <- function(phone) {
+.clean_phone_number <- function(phone) {
   phone %>%
     na_if("") %>%
     str_replace_all("\\D", "") %>%
@@ -223,7 +227,7 @@ df <- df %>%
   #  the phrase 'phone_number'
   mutate(across(
     starts_with("phone_number"),
-    ~ clean_phone_number(.x)
+    ~ .clean_phone_number(.x)
     )) %>%
   # We are not going to aggregate across the phone number rows, so we need to
   #  transform row-wise.
@@ -241,7 +245,7 @@ df <- df %>%
   # List columns really suck so I'm going to kill this one
   select(-phone_number_unique) %>%
   # Count how many entries there are for each phone number
-  add_count(phone_number, name="phone_number_n_entries") %>%
+  add_count(phone_number, name="phone_number_n_entries")
   # Reordering makes debugging way easier
   # relocate(unique_index, phone_number, phone_number_n_entries) %>%
   # This is to see if there are duplicate entries
@@ -260,7 +264,7 @@ have no corresponding baseline.
 ```{r}
 #| label: remove-junk
 
-clean <- df %>%
+df <- df %>%
   # Do we care about un-finished entries?
   filter(finished == 1) %>%
   # Remove entries which have the same phone number and experimental group
@@ -275,7 +279,57 @@ clean <- df %>%
   relocate(unique_index, num_measurements, phone_number) %>%
   arrange(desc(num_measurements), phone_number, experiment_group)
 
-table(clean$num_measurements)
+table(df$num_measurements)
 ```
 After this sage of cleaning, we have 778 baseline measurements with no follow-up
-and 447 baseline/follow-up pairs.
+and 447 baseline/follow-up pairs. Cool! Let's see how our columns are looking.
+
+```{r}
+DOCS_DIR = "tables"
+
+dtypes <- df %>%
+  summarise(across(everything(), ~ class(.x)[1])) %>%
+  pivot_longer(everything(), names_to = "column_name", values_to = "dtype")
+
+# This gets the percent of entries that are NA based on what experimental
+#  group the entry is part of.
+percent_na <- df %>%
+  # Fill any empty strings with NA
+  mutate(across(
+    where(is_character),
+    ~ na_if(.x, "")
+    )) %>%
+  group_by(experiment_group) %>%
+  # Get the percent of each group which is NA
+  summarise(across(everything(), ~ mean(is.na(.x)))) %>%
+  # These group names will become column names, so let's be clearer
+  mutate(experiment_group = paste("percent_na", experiment_group, sep="_")) %>%
+  # This rotates the data so I can scroll down instead of sideways
+  pivot_longer(
+    cols = -experiment_group,
+    names_to = "column_name",
+    values_to = "percent_na"
+  ) %>%
+  # This turns experiment_group and percent_na columns into three columns,
+  #  baseline_percent_na, control_percent_na, treatment_percent_na;
+  #  those names are stored in the experiment_group column right now.
+  pivot_wider(
+    names_from = experiment_group,
+    values_from = "percent_na"
+  )
+
+# Now let's add this info to the column digest and sort it
+column_digest <- column_digest %>%
+  full_join(percent_na, by = "column_name") %>%
+  full_join(dtypes, by = "column_name") %>%
+  # We do these in reverse order
+  relocate(starts_with("label")) %>%
+  relocate(starts_with("original_name")) %>%
+  relocate(starts_with("percent_na")) %>%
+  relocate(column_name, "dtype")
+
+# Let's save this as a Markdown artifact
+column_digest %>%
+  kable(format = "markdown") %>%
+  writeLines(con = file.path(DOCS_DIR, "column_digest.md"))
+```
