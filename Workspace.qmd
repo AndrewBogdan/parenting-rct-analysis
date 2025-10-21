@@ -35,7 +35,8 @@ load_data <- function(sav_filename, column_names) {
       attr(column, "original_name") <- name
       column
     }) %>%
-    as_tibble()
+    as_tibble() %>%
+    mutate(index = row_number())
 }
 
 # I know double-assignment like this is bad form but I need the long names
@@ -49,9 +50,8 @@ spanish_control_df <- load_data("SPANISH_Child Follow-Up - Control.sav")
 spanish_treatment_df <- load_data("SPANISH_Child Follow-Up - Experimental.sav")
 ```
 
-I want usable names now. You'll notice I (above) saved the old names as an
-attribute in the columns. This is for debugging, as I'm worried that I'll 
-misinterpret the columns or mismatch them columns when merging.
+I want usable names now. You'll notice I (above) saved the old names as an attribute in the columns. This is for debugging, as I'm worried that I'll misinterpret the columns or mismatch them columns when merging.
+
 ```{r}
 #| label: rename-columns
 
@@ -94,9 +94,8 @@ spanish_treatment_df <- spanish_treatment_df %>%
   rename_columns(column_name_map_spanish)
 ```
 
-This here is a cell which will dump to a CSV the old column names, new column
-names, and label of the dataframes. This is for visual inspection, to make 
-sure we labeled our data correctly.
+This here is a cell which will dump to a CSV the old column names, new column names, and label of the dataframes. This is for visual inspection, to make sure we labeled our data correctly.
+
 ```{r}
 #| label: dump-column-debug
 #| eval: false
@@ -106,8 +105,8 @@ DEBUG_COLUMN_NAMES_DIR <- "debug_column_names"
 .debug_dump_column_info_to_csv <- function(df, csv_filename) {
   tibble(
     name = names(df),
-    original_name = map_chr(df, ~ attr(.x, "original_name")),
-    label = map_chr(df, ~ attr(.x, "label"))
+    original_name = map_chr(df, ~ attr(.x, "original_name") %||% ""),
+    label = map_chr(df, ~ attr(.x, "label") %||% "")
   ) %>% write_csv(file.path(DEBUG_COLUMN_NAMES_DIR, csv_filename))
 }
 
@@ -120,3 +119,163 @@ spanish_control_df %>% .debug_dump_column_info_to_csv("spanish_control.csv")
 spanish_treatment_df %>% .debug_dump_column_info_to_csv("spanish_treatment.csv")
 ```
 
+Alright now let's merge them. I'd like to make some more accountability on if we are merging the right columns together, but knowing what they look like merged will be super helpful for that.
+
+```{r}
+#| label: data-tracking
+
+# Add languages, baseline/control/treatment, legible ID column
+.languages = c("english", "spanish")
+.group = c("baseline", "control", "treatment")
+
+english_baseline_df <- english_baseline_df %>%
+  mutate(
+    survey_lang = factor("english", levels = .languages),
+    experiment_group = factor("baseline", levels = .group),
+    unique_index = paste("en-bl-", index, sep="")
+  ) %>%
+  relocate(unique_index)
+
+english_control_df <- english_control_df %>%
+  mutate(
+    survey_lang = factor("english", levels = .languages),
+    experiment_group = factor("control", levels = .group),
+    unique_index = paste("en-c-", index, sep="")
+  ) %>%
+  relocate(unique_index)
+
+english_treatment_df <- english_treatment_df %>%
+  mutate(
+    survey_lang = factor("english", levels = .languages),
+    experiment_group = factor("treatment", levels = .group),
+    unique_index = paste("en-tx-", index, sep="")
+  ) %>%
+  relocate(unique_index)
+
+spanish_baseline_df <- spanish_baseline_df %>%
+  mutate(
+    survey_lang = factor("spanish", levels = .languages),
+    experiment_group = factor("baseline", levels = .group),
+    unique_index = paste("es-bl-", index, sep="")
+  ) %>%
+  relocate(unique_index)
+
+spanish_baseline_2_df <- spanish_baseline_2_df %>%
+  mutate(
+    survey_lang = factor("spanish", levels = .languages),
+    experiment_group = factor("baseline", levels = .group),
+    unique_index = paste("es-bl2-", index, sep="")
+  ) %>%
+  relocate(unique_index)
+
+spanish_control_df <- spanish_control_df %>%
+  mutate(
+    survey_lang = factor("spanish", levels = .languages),
+    experiment_group = factor("control", levels = .group),
+    unique_index = paste("es-c-", index, sep="")
+  ) %>%
+  relocate(unique_index)
+
+spanish_treatment_df <- spanish_treatment_df %>%
+  mutate(
+    survey_lang = factor("spanish", levels = .languages),
+    experiment_group = factor("treatment", levels = .group),
+    unique_index = paste("es-tx-", index, sep="")
+  ) %>%
+  relocate(unique_index)
+```
+
+This next cell is going to make a bunch of warnings. I am suppressing them against my better judgement— it doesn't like that we're combining columns with haven labels that are different. Some are Spanish, and some are English. For data accountability reasons, I should handle this, I'm just in a rush right now.
+
+```{r warning=FALSE}
+#| label: merge
+
+# This should have 125 colums now.
+df <- bind_rows(
+  english_baseline_df,
+  english_control_df,
+  english_treatment_df,
+  spanish_baseline_df,
+  spanish_baseline_2_df,
+  spanish_control_df,
+  spanish_treatment_df
+)
+```
+
+We want to match baseline to treatment/control entries. We're going to use phone number to do that; first let's clean those up.
+
+```{r}
+#| label: phone-number
+# This piece of code is a little nasty— I'd love to learn how to
+#  make it less so at a different time.
+
+#' This function removes all non-digits and then takes the 
+#' last 10 digits to get the phone number without country code.
+clean_phone_number <- function(phone) {
+  phone %>%
+    na_if("") %>%
+    str_replace_all("\\D", "") %>%
+    str_replace_all("\\d+(\\d{10})", "\\1")
+}
+
+df <- df %>%
+  # Apply the clean_phone_number function to every column which starts with
+  #  the phrase 'phone_number'
+  mutate(across(
+    starts_with("phone_number"),
+    ~ clean_phone_number(.x)
+    )) %>%
+  # We are not going to aggregate across the phone number rows, so we need to
+  #  transform row-wise.
+  rowwise() %>%
+  mutate(
+    # List oll of the unique phone numbers they submitted. Hopefully, this is
+    #  a single-length list for every entry.
+    phone_number_unique = list(unique(na.omit(c_across(starts_with("phone_number"))))),
+    # The number of phone numbers they submitted; hopefully 1
+    phone_number_n_unique = length(phone_number_unique),
+    # One of the (hopefully the only) phone number they submitted.
+    phone_number = pluck(phone_number_unique, 1, .default=NA)
+  ) %>%
+  ungroup() %>%
+  # List columns really suck so I'm going to kill this one
+  select(-phone_number_unique) %>%
+  # Count how many entries there are for each phone number
+  add_count(phone_number, name="phone_number_n_entries") %>%
+  # Reordering makes debugging way easier
+  # relocate(unique_index, phone_number, phone_number_n_entries) %>%
+  # This is to see if there are duplicate entries
+  # arrange(desc(phone_number_n_entries))
+```
+
+Okay, so we have many (280) submissions which have no phone number associated
+with them. We also have some phone numbers with up to 4 usages in the same
+stage of the trial (en-bl-197, 198, 338, and 443). This means we have some
+additional cleaning to do.
+
+In particular, we need to drop any entries which share both phone number and 
+experimental group. We also have to get rid of treatment/control entries which
+have no corresponding baseline.
+
+```{r}
+#| label: remove-junk
+
+clean <- df %>%
+  # Do we care about un-finished entries?
+  filter(finished == 1) %>%
+  # Remove entries which have the same phone number and experimental group
+  group_by(phone_number, experiment_group) %>%
+  filter(n() == 1) %>%
+  ungroup() %>%
+  # Let's recount these
+  add_count(phone_number, name="num_measurements") %>%
+  # Remove control/treatment measurements with no baseline
+  filter(experiment_group == "baseline" | num_measurements > 1) %>%
+  # Relocate & sort for Andrew reasons
+  relocate(unique_index, num_measurements, phone_number) %>%
+  arrange(desc(num_measurements), phone_number, experiment_group)
+
+table(clean$num_measurements)
+```
+After this sage of cleaning, we have 778 baseline measurements with no follow-up
+and 447 baseline/follow-up pairs.

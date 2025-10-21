@@ -3,6 +3,8 @@
 data/*
 # Except for the file which says what data I need
 !data/DATA.md
+# Take a guess
+debug*
 
 # -------------------------------------
 # Gitignore templates
