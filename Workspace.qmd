@@ -7,13 +7,17 @@ editor: visual
 
 ## Child Analysis
 
-```{r message=FALSE}
+```{r}
 #| label: packages
+#| message: false
+
 # TODO: Pin versions in knitted output for reproducability
 library(tidyverse)
 library(haven)
 library(knitr)  # For kable, you don't _really_ need it
 ```
+
+### Data Cleaning
 
 Okay let's take a look at our data.
 
@@ -95,13 +99,11 @@ spanish_treatment_df <- spanish_treatment_df %>%
   .rename_columns(column_name_map_spanish)
 ```
 
-Before we merge, we want to save some information about where our columns came
-from. We're going to collect the old column names, new column names, and labels
-for each source dataframe into a tibble. This is for visual inspection, to make 
-sure we labeled our data correctly.
+Before we merge, we want to save some information about where our columns came from. We're going to collect the old column names, new column names, and labels for each source dataframe into a tibble. This is for visual inspection, to make sure we labeled our data correctly.
 
-```{r}
+```{r }
 #| label: col-data-tracking
+#| eval: false
 
 .dump_column_info <- function(df, postfix = "") {
   tibble(
@@ -126,6 +128,8 @@ Alright now let's merge them. I'd like to make some more accountability on if we
 
 ```{r}
 #| label: row-data-tracking
+# This cell actually has to run, as the row information we add is used to sort
+#  rows.
 
 # Add languages, baseline/control/treatment, legible ID column
 .languages = c("english", "spanish")
@@ -188,11 +192,11 @@ spanish_treatment_df <- spanish_treatment_df %>%
   relocate(unique_index)
 ```
 
-This next cell is going to make a bunch of warnings. I am suppressing them against my better judgement— it doesn't like that we're combining columns with haven labels that are different. Some are Spanish, and some are English. I'll remove the labels manually when I 
-get time.
+This next cell is going to make a bunch of warnings. I am suppressing them against my better judgement— it doesn't like that we're combining columns with haven labels that are different. Some are Spanish, and some are English. I'll remove the labels manually when I get time.
 
-```{r warning=FALSE}
+```{r}
 #| label: merge
+#| warning: false
 
 # This should have 125 colums now.
 df <- bind_rows(
@@ -233,7 +237,7 @@ df <- df %>%
   #  transform row-wise.
   rowwise() %>%
   mutate(
-    # List oll of the unique phone numbers they submitted. Hopefully, this is
+    # List all of the unique phone numbers they submitted. Hopefully, this is
     #  a single-length list for every entry.
     phone_number_unique = list(unique(na.omit(c_across(starts_with("phone_number"))))),
     # The number of phone numbers they submitted; hopefully 1
@@ -252,14 +256,9 @@ df <- df %>%
   # arrange(desc(phone_number_n_entries))
 ```
 
-Okay, so we have many (280) submissions which have no phone number associated
-with them. We also have some phone numbers with up to 4 usages in the same
-stage of the trial (en-bl-197, 198, 338, and 443). This means we have some
-additional cleaning to do.
+Okay, so we have many (280) submissions which have no phone number associated with them. We also have some phone numbers with up to 4 usages in the same stage of the trial (en-bl-197, 198, 338, and 443). This means we have some additional cleaning to do.
 
-In particular, we need to drop any entries which share both phone number and 
-experimental group. We also have to get rid of treatment/control entries which
-have no corresponding baseline.
+In particular, we need to drop any entries which share both phone number and experimental group. We also have to get rid of treatment/control entries which have no corresponding baseline.
 
 ```{r}
 #| label: remove-junk
@@ -281,10 +280,15 @@ df <- df %>%
 
 table(df$num_measurements)
 ```
-After this sage of cleaning, we have 778 baseline measurements with no follow-up
-and 447 baseline/follow-up pairs. Cool! Let's see how our columns are looking.
+
+After this sage of cleaning, we have 778 baseline measurements with no follow-up and 447 baseline/follow-up pairs.
+
+Cool! Let's see how our columns are looking.
 
 ```{r}
+#| label: write-column-digest
+#| eval: false
+
 DOCS_DIR = "tables"
 
 dtypes <- df %>%
@@ -332,4 +336,88 @@ column_digest <- column_digest %>%
 column_digest %>%
   kable(format = "markdown") %>%
   writeLines(con = file.path(DOCS_DIR, "column_digest.md"))
+
+# And also as a csv so I can bring it into google docs
+column_digest %>%
+  write_csv("debug/column_digest.csv")
+```
+
+Okay! We have more requests:
+
+-   Aggregate mean responses to each measure
+-   Make the 2x long, combining before/after into one row
+-   Explain the following missing data:
+    -   Adolescent response
+    -   Childhood responses
+    -   IPPA responses
+    -   gender, religion, phone use in follow-ups
+
+First let's take a look at those missing data.
+
+#### (1) Childhood/Adolescent Matching
+
+The percentage of NA in the childhood flourishing measures seems to be exactly the compliment of the NA% of the adolescent flourishing measures, which seems to mean that they were given to different people. Let's check that.
+
+```{r}
+#| label: verify-childhood-adolescent-knit
+#| eval: false
+
+# I'm sorry that I'm doing a for loop here. This hurts me more than it hurts you.
+for (index in 1:12) {
+  # The xor (exclusive or) will give TRUE if exactly on of them is NA.
+  # This will throw an error if there are any rows with both NAs or both data.
+  stopifnot(all(xor(
+    is.na(df[[paste0("childhood_", index)]]),
+    is.na(df[[paste0("adolescent_", index)]])
+  )))
+}
+
+```
+
+Okay, so we're good to go. Now this is the perfect use case for coalesce.
+
+```{r}
+#| label: coalesce-childhood-adolescent
+#| warning: false
+# Once again I am killing the 'conflicting labels' warning instead of dealing with it.
+
+# OK but honestly the tidyverse version that the bot tried to give me was so much worse.
+for (index in 1:12) {
+  df[[paste0("flourishing_", index)]] = coalesce(
+    df[[paste0("childhood_", index)]],
+    df[[paste0("adolescent_", index)]]
+  )
+}
+```
+
+#### (2) Survey Response Aggregates
+
+We are going to aggregate the following responses:
+
+-   `flourishing` (created from `childhood` and `adolescent`), 12 measurements
+-   `ippa` (14 measurements)
+-   `patience` (2 measurements)
+-   `serenity` (11 measurements)
+-   `parent_love` (3 measurements)
+-   `child_love` (3 measurements)
+-   `extra_binary` (9 measurements): this one is a problem, as #4 is missing in the treatment group and #3 has half a percent missing. It's only for the follow-ups too.
+-   `extra_scale` (9 measurements) Also only follow-up.
+
+```{r}
+#| label: aggregate
+
+# NOTE: I used matches here so that this line is idempotent. Because it's an
+#  average, this makes no difference, but this is better form anyway.
+df <- df %>%
+  rowwise() %>%
+  summarize(
+    flourishing_mean = mean(c_across(matches("flourishing_\\d+")), na.rm = FALSE),
+    ippa_mean = mean(c_across(matches("ippa_\\d+")), na.rm = FALSE),
+    patience_mean = mean(c_across(matches("patience_\\d+")), na.rm = FALSE),
+    serenity_mean = mean(c_across(matches("serenity_\\d+")), na.rm = FALSE),
+    parent_love_mean = mean(c_across(matches("parent_love_\\d+")), na.rm = FALSE),
+    child_love_mean = mean(c_across(matches("child_love_\\d+")), na.rm = FALSE),
+    # flourishing_mean = mean(c_across(matches("extra_binary")), na.rm = FALSE),
+    extra_scale_mean = mean(c_across(matches("extra_scale_\\d+")), na.rm = FALSE),
+  )
 ```
