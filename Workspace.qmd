@@ -11,13 +11,14 @@ editor: visual
 #| label: packages
 #| message: false
 
-# TODO: Pin versions in knitted output for reproducability
 library(tidyverse)
 library(haven)
 library(knitr)  # For kable, you don't _really_ need it
 ```
 
 ### Data Cleaning
+
+#### Load, Track, Merge
 
 Okay let's take a look at our data.
 
@@ -198,7 +199,7 @@ This next cell is going to make a bunch of warnings. I am suppressing them again
 #| label: merge
 #| warning: false
 
-# This should have 125 colums now.
+# This should have 125 columns now.
 df <- bind_rows(
   english_baseline_df,
   english_control_df,
@@ -210,10 +211,14 @@ df <- bind_rows(
 )
 ```
 
-We want to match baseline to treatment/control entries. We're going to use phone number to do that; first let's clean those up.
+#### Cleaning Specific Columns
+
+**NOTE**: I almost converted the numeric survey responses to numeric with `as.numeric` here. However, that nukes the labels, and I want to preserve those as long as possible. Hence, I'm adopting the custom: convert them to numeric whenever you need them, but don't touch the original data.
+
+We want to match baseline to treatment/control entries. We're going to use phone number to do that; let's clean those up.
 
 ```{r}
-#| label: phone-number
+#| label: clean-phone-number
 # This piece of code is a little nasty— I'd love to learn how to
 #  make it less so at a different time.
 
@@ -256,6 +261,8 @@ df <- df %>%
   # arrange(desc(phone_number_n_entries))
 ```
 
+#### Drop Bad Data
+
 Okay, so we have many (280) submissions which have no phone number associated with them. We also have some phone numbers with up to 4 usages in the same stage of the trial (en-bl-197, 198, 338, and 443). This means we have some additional cleaning to do.
 
 In particular, we need to drop any entries which share both phone number and experimental group. We also have to get rid of treatment/control entries which have no corresponding baseline.
@@ -283,64 +290,7 @@ table(df$num_measurements)
 
 After this sage of cleaning, we have 778 baseline measurements with no follow-up and 447 baseline/follow-up pairs.
 
-Cool! Let's see how our columns are looking.
-
-```{r}
-#| label: write-column-digest
-#| eval: false
-
-DOCS_DIR = "tables"
-
-dtypes <- df %>%
-  summarise(across(everything(), ~ class(.x)[1])) %>%
-  pivot_longer(everything(), names_to = "column_name", values_to = "dtype")
-
-# This gets the percent of entries that are NA based on what experimental
-#  group the entry is part of.
-percent_na <- df %>%
-  # Fill any empty strings with NA
-  mutate(across(
-    where(is_character),
-    ~ na_if(.x, "")
-    )) %>%
-  group_by(experiment_group) %>%
-  # Get the percent of each group which is NA
-  summarise(across(everything(), ~ mean(is.na(.x)))) %>%
-  # These group names will become column names, so let's be clearer
-  mutate(experiment_group = paste("percent_na", experiment_group, sep="_")) %>%
-  # This rotates the data so I can scroll down instead of sideways
-  pivot_longer(
-    cols = -experiment_group,
-    names_to = "column_name",
-    values_to = "percent_na"
-  ) %>%
-  # This turns experiment_group and percent_na columns into three columns,
-  #  baseline_percent_na, control_percent_na, treatment_percent_na;
-  #  those names are stored in the experiment_group column right now.
-  pivot_wider(
-    names_from = experiment_group,
-    values_from = "percent_na"
-  )
-
-# Now let's add this info to the column digest and sort it
-column_digest <- column_digest %>%
-  full_join(percent_na, by = "column_name") %>%
-  full_join(dtypes, by = "column_name") %>%
-  # We do these in reverse order
-  relocate(starts_with("label")) %>%
-  relocate(starts_with("original_name")) %>%
-  relocate(starts_with("percent_na")) %>%
-  relocate(column_name, "dtype")
-
-# Let's save this as a Markdown artifact
-column_digest %>%
-  kable(format = "markdown") %>%
-  writeLines(con = file.path(DOCS_DIR, "column_digest.md"))
-
-# And also as a csv so I can bring it into google docs
-column_digest %>%
-  write_csv("debug/column_digest.csv")
-```
+### More Requests
 
 Okay! We have more requests:
 
@@ -408,16 +358,98 @@ We are going to aggregate the following responses:
 
 # NOTE: I used matches here so that this line is idempotent. Because it's an
 #  average, this makes no difference, but this is better form anyway.
+# NOTE2: I used rowwise/summarize/c_across at first but it hung forever.
 df <- df %>%
-  rowwise() %>%
-  summarize(
-    flourishing_mean = mean(c_across(matches("flourishing_\\d+")), na.rm = FALSE),
-    ippa_mean = mean(c_across(matches("ippa_\\d+")), na.rm = FALSE),
-    patience_mean = mean(c_across(matches("patience_\\d+")), na.rm = FALSE),
-    serenity_mean = mean(c_across(matches("serenity_\\d+")), na.rm = FALSE),
-    parent_love_mean = mean(c_across(matches("parent_love_\\d+")), na.rm = FALSE),
-    child_love_mean = mean(c_across(matches("child_love_\\d+")), na.rm = FALSE),
-    # flourishing_mean = mean(c_across(matches("extra_binary")), na.rm = FALSE),
-    extra_scale_mean = mean(c_across(matches("extra_scale_\\d+")), na.rm = FALSE),
+  mutate(across(
+    # Is this nasty? I'm sorry
+    matches("(flourishing|ippa|patience|serenity|(parent|child)_love|extra_(binary|scale))_\\d+"),
+    as.numeric
+  )) %>%
+  mutate(
+    flourishing_mean = rowMeans(select(., matches("flourishing_\\d+")), na.rm = FALSE),
+    ippa_mean = rowMeans(select(., matches("ippa_\\d+")), na.rm = FALSE),
+    patience_mean = rowMeans(select(., matches("patience_\\d+")), na.rm = FALSE),
+    serenity_mean = rowMeans(select(., matches("serenity_\\d+")), na.rm = FALSE),
+    parent_love_mean = rowMeans(select(., matches("parent_love_\\d+")), na.rm = FALSE),
+    child_love_mean = rowMeans(select(., matches("child_love_\\d+")), na.rm = FALSE),
+    # flourishing_mean = rowMeans(select(., matches("extra_binary")), na.rm = FALSE),
+    extra_scale_mean = rowMeans(select(., matches("extra_scale_\\d+")), na.rm = FALSE),
   )
+```
+
+### Output
+
+This is the end of this document: output artifacts.
+
+#### Column Digest
+
+This creates a table where each row is one column in our dataframe. It collects information about every column so you can see what's going on. It's for documentation and debugging.
+
+This relies on you running the @ref(chunk:col-data-tracking) chunk.
+
+```{r}
+#| label: write-column-digest
+#| eval: false
+
+DOCS_DIR = "tables"
+
+#' I make a function and then call it exactly once— why?
+#'  I actually use this function a bunch while debugging. I'd move it to a
+#'  separate file but that would be confusing.
+.make_dtypes <- function(df) {
+  df %>%
+    summarise(across(everything(), ~ class(.x)[1])) %>%
+    pivot_longer(everything(), names_to = "column_name", values_to = "dtype")
+}
+
+dtypes <- .make_dtypes(df)
+
+# This gets the percent of entries that are NA based on what experimental
+#  group the entry is part of.
+# I'd like to make this a function to, but I don't have an idiomatic way to 
+#  abstract the grouping without making it mandatory. Hence, until I need it,
+#  it won't get the dev time.
+percent_na <- df %>%
+  # Fill any empty strings with NA
+  mutate(across(
+    where(is_character),
+    ~ na_if(.x, "")
+    )) %>%
+  group_by(experiment_group) %>%
+  # Get the percent of each group which is NA
+  summarise(across(everything(), ~ mean(is.na(.x)))) %>%
+  # These group names will become column names, so let's be clearer
+  mutate(experiment_group = paste("percent_na", experiment_group, sep="_")) %>%
+  # This rotates the data so I can scroll down instead of sideways
+  pivot_longer(
+    cols = -experiment_group,
+    names_to = "column_name",
+    values_to = "percent_na"
+  ) %>%
+  # This turns experiment_group and percent_na columns into three columns,
+  #  baseline_percent_na, control_percent_na, treatment_percent_na;
+  #  those names are stored in the experiment_group column right now.
+  pivot_wider(
+    names_from = experiment_group,
+    values_from = "percent_na"
+  )
+
+# Now let's add this info to the column digest and sort it
+column_digest <- column_digest %>%
+  full_join(percent_na, by = "column_name") %>%
+  full_join(dtypes, by = "column_name") %>%
+  # We do these in reverse order
+  relocate(starts_with("label")) %>%
+  relocate(starts_with("original_name")) %>%
+  relocate(starts_with("percent_na")) %>%
+  relocate(column_name, "dtype")
+
+# Let's save this as a Markdown artifact
+column_digest %>%
+  kable(format = "markdown") %>%
+  writeLines(con = file.path(DOCS_DIR, "column_digest.md"))
+
+# And also as a csv so I can bring it into google docs
+column_digest %>%
+  write_csv("debug/column_digest.csv")
 ```
