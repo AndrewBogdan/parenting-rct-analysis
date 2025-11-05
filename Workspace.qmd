@@ -543,6 +543,18 @@ df2x <- df %>%
   select(-experiment_group_bl, -experiment_group_fu)
 ```
 
+Let's combine any columns which don't change between baseline and follow-up.
+
+```{r}
+#| label: combine-constant-cols
+
+stopifnot(all(df2x$survey_lang_bl == df2x$survey_lang_fu))
+df2x <- df2x %>%
+  rename(survey_lang = survey_lang_bl) %>%
+  select(-survey_lang_fu)
+
+```
+
 There are a bunch of things you'd assume wouldn't change between baseline and 
 follow-up, but they do:
 
@@ -560,7 +572,6 @@ df2x %>%
 df2x %>%
   filter(df2x$gender_bl != df2x$gender_fu) %>%
   select(person_id, starts_with("index"), starts_with("gender"))
-
 ```
 
 How you clean these is a choice, so I can't handle those during data cleaning.
@@ -575,7 +586,7 @@ This is the end of this document: output artifacts.
 OUT_DIR <- "data"
 
 df %>% write_dta(file.path(OUT_DIR, "child_data_clean.dta"))
-df %>% write_dta(file.path(OUT_DIR, "child_data_clean_double_wide.dta"))
+df2x %>% write_dta(file.path(OUT_DIR, "child_data_clean_double_wide.dta"))
 
 ```
 
@@ -664,20 +675,68 @@ column_digest %>%
   write_csv("debug/column_digest.csv")
 ```
 
-## Analysis
+## BAD STATS DO NOT USE
 
 Let's do a basic analysis so we have something to talk about during the meeting.
 
 ```{r}
-df2x <- df2x %>% mutate(
-  flourishing_diff = flourishing_mean_fu - flourishing_mean_bl,
-  ippa_diff = ippa_mean_fu - ippa_mean_bl,
-  patience_diff = patience_mean_fu - patience_mean_bl,
-  serenity_diff = serenity_mean_fu - serenity_mean_bl,
-  parent_love_diff = parent_love_mean_fu - parent_love_mean_bl,
-  child_love_diff = child_love_mean_fu - child_love_mean_bl
-)
+# Making sure we haven't lost data
+stopifnot(nrow(df2x) == 447)
 
-model <- lm(flourishing_diff ~ treatment, data=df2x)
-confint(model)
+df2x <- df2x %>%
+  mutate(
+    flourishing_diff = flourishing_mean_fu - flourishing_mean_bl,
+    # This one has a lot of NA, unfortunately.
+    ippa_diff = ippa_mean_fu - ippa_mean_bl,
+    patience_diff = patience_mean_fu - patience_mean_bl,
+    serenity_diff = serenity_mean_fu - serenity_mean_bl,
+    parent_love_diff = parent_love_mean_fu - parent_love_mean_bl,
+    child_love_diff = child_love_mean_fu - child_love_mean_bl
+  )
+
+# Let's clean up gender
+# We're going to assume gender did not change if they didn't supply the second time.
+# This should leave us with 443 rows.
+df2x <- df2x %>% 
+  filter(gender_bl == gender_fu | is.na(gender_fu)) %>%
+  mutate(gender = coalesce(gender_bl, gender_fu)) %>%
+  relocate(gender, .before = gender_bl) %>%
+  # Don't need these anymore
+  select(-gender_bl, -gender_fu, -gender_custom_bl, -gender_custom_fu)
+```
+
+Alright let's run some models real quick.
+
+This is _BAD STATS_!!! Don't use it in a paper, this is preliminary analysis.
+In particular, it doesn't account for variable attrition.
+
+```{r}
+# A really simple model
+confint(lm(flourishing_diff ~ treatment, data = df2x))
+
+# Involve more covariates
+confint(model <- lm(
+  flourishing_diff ~ 
+    treatment +
+    gender * treatment +  # Gender; see if treatment works for specific genders
+    survey_lang * treatment +
+    phone_use * treatment +
+    religion * treatment +
+    age * treatment,
+  data = df2x %>%
+    mutate(
+      # We're missing followup phone use.
+      # I've subtracted 1 so that it's roughly the number of hours they spend
+      #  on their phone in a day.
+      phone_use = phone_use_bl - 1,
+      # We don't have follow-up religion data.
+      # This is a roughly 50/50 split which divides people who
+      #  worship regularly from people who only go on holidays.
+      religion = religion_bl < 3,
+      # Age is on a scale from 1 to 9 which is actually 9 to 17.
+      # I'm going to roughly mean-center it at age 13.
+      # We're going to use age baseline because... yeah.
+      age = age_bl - 5
+    )),
+  level = 0.95)
 ```
