@@ -3,6 +3,8 @@ title: "Parenting RCT (Child Analysis)"
 author: "Andrew Bogdan"
 format: html
 editor: visual
+execute:
+  cache: true
 ---
 
 ## Child Analysis
@@ -19,6 +21,12 @@ library(knitr)  # For kable, you don't _really_ need it
 ### Data Cleaning
 
 #### Load, Track, Merge
+
+In this section, I do a lot of very similar operations seven times, for each
+dataset. This is intentional: looping over a fixed seven datasets makes no
+sense and the logic to have each iteration of the loop be slightly different
+would be less readable and more error-prone. This is the most declarative way
+I could think of to do it.
 
 Okay let's take a look at our data.
 
@@ -115,7 +123,7 @@ Before we merge, we want to save some information about where our columns came f
   )
 }
 
-column_digest <- .dump_column_info(english_baseline_df, "_en_bl") %>%
+column_origins <- .dump_column_info(english_baseline_df, "_en_bl") %>%
   full_join(.dump_column_info(english_control_df, "_en_c"), by = "column_name") %>%
   full_join(.dump_column_info(english_treatment_df, "_en_tx"), by = "column_name") %>%
   full_join(.dump_column_info(spanish_baseline_df, "_es_bl"), by = "column_name") %>%
@@ -141,56 +149,49 @@ english_baseline_df <- english_baseline_df %>%
     survey_lang = factor("english", levels = .languages),
     experiment_group = factor("baseline", levels = .group),
     unique_index = paste("en-bl-", index, sep="")
-  ) %>%
-  relocate(unique_index)
+  )
 
 english_control_df <- english_control_df %>%
   mutate(
     survey_lang = factor("english", levels = .languages),
     experiment_group = factor("control", levels = .group),
     unique_index = paste("en-c-", index, sep="")
-  ) %>%
-  relocate(unique_index)
+  )
 
 english_treatment_df <- english_treatment_df %>%
   mutate(
     survey_lang = factor("english", levels = .languages),
     experiment_group = factor("treatment", levels = .group),
     unique_index = paste("en-tx-", index, sep="")
-  ) %>%
-  relocate(unique_index)
+  )
 
 spanish_baseline_df <- spanish_baseline_df %>%
   mutate(
     survey_lang = factor("spanish", levels = .languages),
     experiment_group = factor("baseline", levels = .group),
     unique_index = paste("es-bl-", index, sep="")
-  ) %>%
-  relocate(unique_index)
+  )
 
 spanish_baseline_2_df <- spanish_baseline_2_df %>%
   mutate(
     survey_lang = factor("spanish", levels = .languages),
     experiment_group = factor("baseline", levels = .group),
     unique_index = paste("es-bl2-", index, sep="")
-  ) %>%
-  relocate(unique_index)
+  )
 
 spanish_control_df <- spanish_control_df %>%
   mutate(
     survey_lang = factor("spanish", levels = .languages),
     experiment_group = factor("control", levels = .group),
     unique_index = paste("es-c-", index, sep="")
-  ) %>%
-  relocate(unique_index)
+  )
 
 spanish_treatment_df <- spanish_treatment_df %>%
   mutate(
     survey_lang = factor("spanish", levels = .languages),
     experiment_group = factor("treatment", levels = .group),
     unique_index = paste("es-tx-", index, sep="")
-  ) %>%
-  relocate(unique_index)
+  )
 ```
 
 This next cell is going to make a bunch of warnings. I am suppressing them against my better judgement— it doesn't like that we're combining columns with haven labels that are different. Some are Spanish, and some are English. I'll remove the labels manually when I get time.
@@ -209,6 +210,29 @@ df <- bind_rows(
   spanish_control_df,
   spanish_treatment_df
 )
+```
+
+#### Drop Identifying/Useless Data
+
+We really don't need their name, email, and location. I honestly don't know if
+I'm allowed to have access to it.
+
+```{r}
+#| label: drop_id_useless_data
+
+df <- df %>% select(
+  -ip_address,
+  -last_name,
+  -first_name,
+  -email,
+  -location_latitude,
+  -location_longitude,
+  # I created this, and I can un-create it
+  -index
+) %>%
+  rename(index = unique_index)
+
+
 ```
 
 #### Cleaning Specific Columns
@@ -255,10 +279,66 @@ df <- df %>%
   select(-phone_number_unique) %>%
   # Count how many entries there are for each phone number
   add_count(phone_number, name="phone_number_n_entries")
-  # Reordering makes debugging way easier
-  # relocate(unique_index, phone_number, phone_number_n_entries) %>%
-  # This is to see if there are duplicate entries
-  # arrange(desc(phone_number_n_entries))
+
+# Sanity check: they only submitted one phone number, right?
+df %>% count(phone_number_n_unique)
+```
+
+I'm seeing 2128 response with one phone number and 280 responses with no phone number.
+I actually did check, the responses with no phone number had empty phone number 
+columns in the original data too.
+
+Okay let's replace the phone numbers with something a little more readable.
+
+```{r}
+#| label: anonymize 
+
+# This function was fun but probably not worth the time, oops.
+
+#' Make a readable ID in the format /[A-Z]\d+/.
+#' Attempts to minimize the length of the digits, which will be less readable
+#'  when there are a small number of IDs.
+.readable_id <- function(ids) {
+  ids <- factor(ids)  # We need this as a factor
+  anon_levels = 0:(nlevels(ids) - 1)  # Indexing from zero for math
+  n_groups = ceiling(length(anon_levels) / 26)
+  readable_ids <- mapply(
+    paste0,
+    LETTERS[anon_levels %/% n_groups + 1],
+    anon_levels %% n_groups,
+    USE.NAMES=FALSE
+  )
+  # Sanity check
+  stopifnot(!any(duplicated(readable_ids)))
+  # Set levels and return
+  levels(ids) <- readable_ids
+  ids
+}
+
+# Let's save it in person_id
+df$person_id = .readable_id(df$phone_number)
+
+# Now drop everything related to phone number
+df <- df %>% select(
+  -starts_with("phone_number"),
+  -country_code
+  )
+```
+
+Let's make the birthdays nicer too.
+
+```{r}
+#| label: clean-birthday
+df <- df %>%
+  mutate(
+    birth_date = make_date(year = birth_year, month = birth_month, day = birth_day)
+  ) %>%
+  select(
+    -birth_day,
+    -birth_month,
+    -birth_year
+  )
+
 ```
 
 #### Drop Bad Data
@@ -267,28 +347,28 @@ Okay, so we have many (280) submissions which have no phone number associated wi
 
 In particular, we need to drop any entries which share both phone number and experimental group. We also have to get rid of treatment/control entries which have no corresponding baseline.
 
+This also drops every entry without a phone number.
+
 ```{r}
 #| label: remove-junk
 
 df <- df %>%
   # Do we care about un-finished entries?
-  filter(finished == 1) %>%
+  # person_id can still be NA
+  filter(finished == 1, !is.na(person_id)) %>%
   # Remove entries which have the same phone number and experimental group
-  group_by(phone_number, experiment_group) %>%
+  group_by(person_id, experiment_group) %>%
   filter(n() == 1) %>%
   ungroup() %>%
   # Let's recount these
-  add_count(phone_number, name="num_measurements") %>%
+  add_count(person_id, name="num_measurements") %>%
   # Remove control/treatment measurements with no baseline
-  filter(experiment_group == "baseline" | num_measurements > 1) %>%
-  # Relocate & sort for Andrew reasons
-  relocate(unique_index, num_measurements, phone_number) %>%
-  arrange(desc(num_measurements), phone_number, experiment_group)
+  filter(experiment_group == "baseline" | num_measurements > 1)
 
 table(df$num_measurements)
 ```
 
-After this sage of cleaning, we have 778 baseline measurements with no follow-up and 447 baseline/follow-up pairs.
+After this sage of cleaning, we have 778 baseline measurements with no follow-up and 447 baseline/follow-up pairs (894 responses which represent 447 pairs).
 
 ### More Requests
 
@@ -360,11 +440,6 @@ We are going to aggregate the following responses:
 #  average, this makes no difference, but this is better form anyway.
 # NOTE2: I used rowwise/summarize/c_across at first but it hung forever.
 df <- df %>%
-  mutate(across(
-    # Is this nasty? I'm sorry
-    matches("(flourishing|ippa|patience|serenity|(parent|child)_love|extra_(binary|scale))_\\d+"),
-    as.numeric
-  )) %>%
   mutate(
     flourishing_mean = rowMeans(select(., matches("flourishing_\\d+")), na.rm = FALSE),
     ippa_mean = rowMeans(select(., matches("ippa_\\d+")), na.rm = FALSE),
@@ -372,8 +447,40 @@ df <- df %>%
     serenity_mean = rowMeans(select(., matches("serenity_\\d+")), na.rm = FALSE),
     parent_love_mean = rowMeans(select(., matches("parent_love_\\d+")), na.rm = FALSE),
     child_love_mean = rowMeans(select(., matches("child_love_\\d+")), na.rm = FALSE),
-    # flourishing_mean = rowMeans(select(., matches("extra_binary")), na.rm = FALSE),
-    extra_scale_mean = rowMeans(select(., matches("extra_scale_\\d+")), na.rm = FALSE),
+    # There's an issue with extra_binary_4 IIRC
+    # extra_binary_mean = rowMeans(select(., matches("extra_binary_\\d+")), na.rm = FALSE),
+    # This one won't coerce to numeric for some reason
+    # extra_scale_mean = rowMeans(select(., matches("extra_scale_\\d+")), na.rm = FALSE)
+  )
+```
+
+#### Reorder Columns
+
+Let's order the columns in a reasonable way.
+
+```{r}
+#| label: reorder-columns
+df <- df %>%
+  relocate(
+    index,
+    person_id,
+    experiment_group,
+    num_measurements,
+  ) %>%
+  relocate(start_date, end_date, recorded_date, .after=response_id) %>%
+  relocate(birth_date, .before=age) %>%
+  relocate(
+    ends_with("_mean"),
+    starts_with("flourishing"),
+    starts_with("ippa"),
+    starts_with("patience"),
+    starts_with("serenity"),
+    starts_with("parent_love"),
+    starts_with("child_love"),
+    starts_with("extra"),
+    starts_with("adolescent"),
+    starts_with("childhood"),
+    .after = last_col()
   )
 ```
 
@@ -434,8 +541,8 @@ percent_na <- df %>%
     values_from = "percent_na"
   )
 
-# Now let's add this info to the column digest and sort it
-column_digest <- column_digest %>%
+# Now let's add this info together and sort it
+column_digest <- column_origins %>%
   full_join(percent_na, by = "column_name") %>%
   full_join(dtypes, by = "column_name") %>%
   # We do these in reverse order
@@ -453,3 +560,4 @@ column_digest %>%
 column_digest %>%
   write_csv("debug/column_digest.csv")
 ```
+
