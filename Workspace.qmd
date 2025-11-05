@@ -569,6 +569,16 @@ How you clean these is a choice, so I can't handle those during data cleaning.
 
 This is the end of this document: output artifacts.
 
+```{r}
+#| label: write-out
+
+OUT_DIR <- "data"
+
+df %>% write_dta(file.path(OUT_DIR, "child_data_clean.dta"))
+df %>% write_dta(file.path(OUT_DIR, "child_data_clean_double_wide.dta"))
+
+```
+
 #### Column Digest
 
 This creates a table where each row is one column in our dataframe. It collects information about every column so you can see what's going on. It's for documentation and debugging.
@@ -652,6 +662,8 @@ column_digest %>%
 ```
 
 ## Analysis
+
+Let's do a basic analysis so we have something to talk about during the meeting.
 
 ```{r}
 df2x <- df2x %>% mutate(
