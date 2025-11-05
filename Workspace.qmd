@@ -7,7 +7,7 @@ execute:
   cache: true
 ---
 
-## Child Analysis
+# Child Analysis
 
 ```{r}
 #| label: packages
@@ -18,8 +18,8 @@ library(haven)
 library(knitr)  # For kable, you don't _really_ need it
 ```
 
-### Data Cleaning
-
+## Data Wrangling
+### Initial Cleaning
 #### Load, Track, Merge
 
 In this section, I do a lot of very similar operations seven times, for each
@@ -217,21 +217,33 @@ df <- bind_rows(
 We really don't need their name, email, and location. I honestly don't know if
 I'm allowed to have access to it.
 
+Additionally, the following columns are constant:
+
+- `status` (always 0),
+- `external_reference` (always empty string)
+- `distribution_channel` (always "anonymous")
+- `langauge` (always "EN", distinct from `survey_lang`)
+
 ```{r}
 #| label: drop_id_useless_data
 
-df <- df %>% select(
-  -ip_address,
-  -last_name,
-  -first_name,
-  -email,
-  -location_latitude,
-  -location_longitude,
-  # I created this, and I can un-create it
-  -index
-) %>%
+df <- df %>%
+  select(
+    -ip_address,
+    -last_name,
+    -first_name,
+    -email,
+    -location_latitude,
+    -location_longitude,
+    # Constant columns
+    -status,
+    -external_reference,
+    -distribution_channel,
+    -language,
+    # I created this, and I can un-create it
+    -index
+  ) %>%
   rename(index = unique_index)
-
 
 ```
 
@@ -338,7 +350,22 @@ df <- df %>%
     -birth_month,
     -birth_year
   )
+```
 
+Let's make gender a factor instead of a number.
+
+```{r}
+#| label: clean-gender
+
+df <- df %>% 
+  mutate(
+    gender = factor(case_match(
+      gender,
+      1 ~ "male",
+      2 ~ "female",
+      3 ~ "other",
+      ))
+    )
 ```
 
 #### Drop Bad Data
@@ -364,6 +391,11 @@ df <- df %>%
   add_count(person_id, name="num_measurements") %>%
   # Remove control/treatment measurements with no baseline
   filter(experiment_group == "baseline" | num_measurements > 1)
+
+# This is now always 100
+stopifnot(all(df$progress == 100))
+# Let's remove them
+df <- df %>% select(-finished, -progress)
 
 table(df$num_measurements)
 ```
@@ -484,6 +516,55 @@ df <- df %>%
   )
 ```
 
+### Making a Initial/Follow-up Dataset
+
+I'm going to make a new dataframe of only the data which has both a baseline
+and a follow-up measurement.
+
+```{r}
+#| label: follow-up-dataframe
+
+df2x <- df %>%
+  # Doing this first should speed things up and will make it so that there are
+  #  no missing data, which will be nice if we accidentally make missing data.
+  filter(num_measurements == 2) %>%
+  # This will be the column prefix; bl is baseline, fu is follow-up.
+  mutate(bl_or_fu = if_else(experiment_group == "baseline", "bl", "fu")) %>%
+  # The big pivot!
+  pivot_wider(
+    id_cols = person_id,
+    names_from = bl_or_fu,
+    values_from = c(-person_id, -bl_or_fu, -num_measurements),
+  ) %>%
+  mutate(treatment = (experiment_group_fu == "treatment")) %>%
+  # Keep my lovely order
+  relocate(treatment, .after=person_id) %>%
+  # Don't need these
+  select(-experiment_group_bl, -experiment_group_fu)
+```
+
+There are a bunch of things you'd assume wouldn't change between baseline and 
+follow-up, but they do:
+
+```{r}
+#| label: observe-broken-data
+#| eval: false
+
+# Birth date shouldn't change, but it does
+# It appears to be mostly kids entering it wrong.
+df2x %>%
+  filter(df2x$birth_date_bl != df2x$birth_date_fu) %>%
+  select(person_id, starts_with("index"), starts_with("birth_date"))
+
+# Gender also changes a few times
+df2x %>%
+  filter(df2x$gender_bl != df2x$gender_fu) %>%
+  select(person_id, starts_with("index"), starts_with("gender"))
+
+```
+
+How you clean these is a choice, so I can't handle those during data cleaning.
+
 ### Output
 
 This is the end of this document: output artifacts.
@@ -509,7 +590,14 @@ DOCS_DIR = "tables"
     pivot_longer(everything(), names_to = "column_name", values_to = "dtype")
 }
 
+.make_num_unique <- function(df) {
+  df %>%
+    summarise(across(everything(), ~ n_distinct(.))) %>%
+    pivot_longer(everything(), names_to = "column_name", values_to = "num_unqiue")
+}
+
 dtypes <- .make_dtypes(df)
+num_unqiue <- .make_num_unique(df)
 
 # This gets the percent of entries that are NA based on what experimental
 #  group the entry is part of.
@@ -543,13 +631,15 @@ percent_na <- df %>%
 
 # Now let's add this info together and sort it
 column_digest <- column_origins %>%
-  full_join(percent_na, by = "column_name") %>%
   full_join(dtypes, by = "column_name") %>%
+  full_join(num_unqiue, by = "column_name") %>%
+  full_join(percent_na, by = "column_name") %>%
   # We do these in reverse order
-  relocate(starts_with("label")) %>%
-  relocate(starts_with("original_name")) %>%
-  relocate(starts_with("percent_na")) %>%
-  relocate(column_name, "dtype")
+  relocate(
+    starts_with("original_name"),
+    starts_with("label"),
+    .after = last_col()
+  )
 
 # Let's save this as a Markdown artifact
 column_digest %>%
@@ -561,3 +651,18 @@ column_digest %>%
   write_csv("debug/column_digest.csv")
 ```
 
+## Analysis
+
+```{r}
+df2x <- df2x %>% mutate(
+  flourishing_diff = flourishing_mean_fu - flourishing_mean_bl,
+  ippa_diff = ippa_mean_fu - ippa_mean_bl,
+  patience_diff = patience_mean_fu - patience_mean_bl,
+  serenity_diff = serenity_mean_fu - serenity_mean_bl,
+  parent_love_diff = parent_love_mean_fu - parent_love_mean_bl,
+  child_love_diff = child_love_mean_fu - child_love_mean_bl
+)
+
+model <- lm(flourishing_diff ~ treatment, data=df2x)
+confint(model)
+```
