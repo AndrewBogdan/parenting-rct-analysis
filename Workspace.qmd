@@ -644,6 +644,8 @@ column_digest <- column_origins %>%
   full_join(dtypes, by = "column_name") %>%
   full_join(num_unqiue, by = "column_name") %>%
   full_join(percent_na, by = "column_name") %>%
+  # Columns moved and were removed; this makes it so that 
+  #  the rows in the digest match the columns in the data.
   filter(column_name %in% names(df)) %>%
   slice(match(names(df), column_digest$column_name)) %>%
   relocate(
